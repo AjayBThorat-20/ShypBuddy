@@ -20,24 +20,24 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
 
-      <div className="relative" >
-         
-            <Navbar />
-      
-            {/* <div className="fixed"> */}
-              <main className="w-full h-full min-h-[calc(100vh-64px)] bg-gray-100 text-gray-600 overflow-y-auto fixed">
-              <Sidebar />
-               
-              <div className="w-auto md:ml-[154px] md:pl-170px lg:mr-4 text-sm">
-        
-        {children}
-</div>
-        
-              </main>
+        <div className="relative" >
+
+          <Navbar />
+
+          {/* <div className="fixed"> */}
+          <main className="w-full h-full min-h-[calc(100vh-64px)] bg-gray-100 text-gray-600 overflow-y-auto fixed">
+            <Sidebar />
+
+            <div className="w-auto md:ml-[154px] md:pl-170px lg:mr-4 text-sm">
+
+              {children}
             </div>
-            
-            {/* </div> */}
-          </body>
+
+          </main>
+        </div>
+
+        {/* </div> */}
+      </body>
     </html>
   );
 }

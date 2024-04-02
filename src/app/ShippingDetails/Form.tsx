@@ -1,453 +1,222 @@
+// Import necessary libraries and modules
 "use client"
 import React, { useState } from "react";
 import { Label, Textarea, Checkbox } from "flowbite-react";
-import type { NextApiRequest, NextApiResponse } from 'next';
-import Airtable from 'airtable';
+import { useForm } from 'react-hook-form';
+import * as z  from "zod";
+import {zodResolver} from "@hookform/resolvers/zod"
 import axios from "axios";
+// import { json } from "stream/consumers";
+// import { fields } from "@hookform/resolvers/ajv/src/__tests__/__fixtures__/data.js";
+
+// Define schema using Zod for form validation
+// const formdataSchema = z.object({
+//   fullName: z.string({required_error:"Full Name must be required", invalid_type_error:"Full Name must be string"}).min(1,"full is required"),
+//   email: z.string({required_error:"Email must be required", invalid_type_error:"Invalid email address"}).email().or(z.literal("")),
+//   mobileNumber: z.string().length(10).regex(/^\d{10}$/),
+//   pincode: z.string({required_error: "Pin Code is required", invalid_type_error: "Pin Code must be a number"}).length(6).regex(/^[1-9][0-9]{5}$/),
+//   state: z.string({required_error: "State is required", invalid_type_error: "State must be a number"}).min(2).max(30),
+//   address: z.string({required_error: "Address is required", invalid_type_error: "Address must be a number"}).max(100),
+//   date: z.string({required_error: "Date is required", invalid_type_error: "Date must be a number"}).regex(/^(0?[1-9]|[12][0-9]|3[01])[\/\-](0?[1-9]|1[012])[\/\-]\d{4}$/),
+//   country: z.string({required_error: "Country is required", invalid_type_error: "Country must be a number"}).min(2).max(30),
+//   cityName: z.string({required_error: "City Name is required", invalid_type_error: "City Name must be a number"}).min(2).max(30),
+//   landmark: z.string({required_error: "Land Mark is required", invalid_type_error: "Land Mark must be a number"}).or(z.literal("")),
+//   others: z.string({required_error: "Others is required", invalid_type_error: "Others must be a number"}).max(15),
+//   gstin: z.string({required_error: "GST IN is required", invalid_type_error: "GST IN  must be a number"}).max(15),
+//   companyName: z.string({required_error: "Company Name is required", invalid_type_error: "Company Name must be a number"}).min(1).max(80)
+// });
+
+
+const formdataSchema = z.object({
+  fullName: z.string().min(1,"full is required"),
+  email: z.string().email().or(z.literal("")),
+  mobileNumber: z.string().length(10).regex(/^\d{10}$/),
+  pincode: z.string().length(6).regex(/^[1-9][0-9]{5}$/),
+  state: z.string().min(2).max(30),
+  address: z.string().max(100),
+  date: z.string().regex(/^(0?[1-9]|[12][0-9]|3[01])[\/\-](0?[1-9]|1[012])[\/\-]\d{4}$/),
+  country: z.string().min(2).max(30),
+  cityName: z.string().min(2).max(30),
+  landmark: z.string().or(z.literal("")),
+  others: z.string().max(15),
+  gstin: z.string().max(15),
+  companyName: z.string().min(1).max(80)
+});
 
 
 
 
-// const apiKey = process.env.NEXT_PUBLIC_AIRTABLE_API_KEY as string;
-// const baseId = process.env.NEXT_PUBLIC_AIRTABLE_BASE_ID as string;
 
 
-// const base = new Airtable({ apiKey: apiKey }).base(baseId);
-function Form(req: NextApiRequest, res: NextApiResponse) {
+// Define component
+function Form() {
+  // Use react-hook-form
 
+  const { register, handleSubmit, formState: { errors }} = useForm({resolver:zodResolver(formdataSchema)});
 
+  const [submitting, setSubmitting] = useState(false);
 
-  interface FormData {
-    fullName: string;
-    email: string;
-    mobileNumber: string;
-    pincode: string;
-    state: string;
-    address: string;
-    date: string;
-    country: string;
-    cityName: string;
-    landmark: string;
-    others: string;
-    gstin: string;
-    companyName:string;
-  }
-
- 
-  const validateForm = (formData: FormData) => {
-    let errors = {};
-
-    // Validation rules for each field
-    if (!formData.fullName.trim()) {
-      errors = { ...errors, fullName: "Full Name is required" };
-    }
-
-    if (!formData.mobileNumber.trim()) {
-      errors = { ...errors, mobileNumber: "Mobile Number is required" };
-    } else if (!/^\d{10}$/i.test(formData.mobileNumber.trim())) {
-      errors = { ...errors, mobileNumber: "Mobile Number is invalid" };
-    }
-
-    if (!formData.pincode.trim()) {
-      errors = { ...errors, pincode: "Pin Code is required" };
-    } else if (!/^\d{6}$/i.test(formData.pincode.trim())) {
-      errors = { ...errors, pincode: "Pin Code is invalid" };
-    }
-
-    if (!formData.state.trim()) {
-      errors = { ...errors, state: "State is required" };
-    }
-
-    if (!formData.address.trim()) {
-      errors = { ...errors, address: "Address is required" };
-    }
-
-    if (!formData.date.trim()) {
-      errors = { ...errors, date: "Date of Shipment is required" };
-    }
-
-    if (!formData.companyName.trim()) {
-      errors = { ...errors, companyName: "Company Name is required" };
-    }
-
-    if (formData.email.trim() && !/^\S+@\S+\.\S+$/.test(formData.email.trim())) {
-      errors = { ...errors, email: "Email is invalid" };
-    }
-
-    // if (formData.gstin.trim() && !/^\d{2}\w{10}$/i.test(formData.gstin.trim())) {
-    //   errors = { ...errors, gstin: "GSTIN is invalid" };
-    // }
-
-    return errors;
-  };
-
-  const [formData, setFormData] = useState<FormData>({
-    fullName: "",
-    email: "",
-    mobileNumber: "",
-    pincode: "",
-    state: "",
-    address: "",
-    date: "",
-    country: "",
-    cityName: "",
-    landmark: "",
-    others: "",
-    gstin: "",
-    companyName: ""
-  });
-
-  const [errors, setErrors] = useState<Partial<FormData>>({});
-
-  const handleInputChange = (e: any) => {
-    const { id, value, type, checked } = e.target;
-    const newValue = type === "checkbox" ? checked : value;
-    setFormData({ ...formData, [id]: newValue });
-  };
-
-  const handleSubmit = async (e: any) => {
-    e.preventDefault();
-    const validationErrors = validateForm(formData);
-    if (Object.keys(validationErrors).length === 0) {
-
-
-      try {
-        const record = await axios.post(`https://api.airtable.com/v0/${process.env.NEXT_PUBLIC_AIRTABLE_BASE_ID}/${process.env.NEXT_PUBLIC_SHIPPLING_TABLE}`,
-          {
-            fields: {
-
-              CityName: formData.cityName,
-              Date: formData.date,
-              State: formData.state,
-              PinCode: formData.pincode,
-              FullName: formData.fullName,
-              Email: formData.email,
-              Address: formData.address,
-              Country: formData.country,
-              Landmark: formData.landmark,
-              GstIN: formData.gstin,
-              MobileNumber: formData.mobileNumber,
-              CompanyName: formData.companyName
-            }
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIRTABLE_API_KEY}`,
-            },
-          }
-        );
-
-        // return res.status(200).json({ message: 'Form submitted successfully', record });
-        console.log('Form submitted successfully', record);
-        console.log('Status code:', res.status);
-      } catch (error: any) {
-        // console.error(error);
-        // return res.status(500).json({ message: 'Failed to submit form' });
-        if (error.response) {
-          // The request was made and the server responded with a status code
-          console.error('Error response:', error.response.data);
-          console.error('Status code:', error.response.status);
-        } else if (error.request) {
-          // The request was made but no response was received
-          console.error('No response received:', error.request);
-        } else {
-          // Something else happened while setting up the request
-          console.error('Error setting up request:', error.message);
+  //  console.log(formdataSchema);
+  // Handle form submission
+  const onSubmit = async (formData:any) => {
+    try {
+      console.log("Form Data:", formData);
+      const record = await axios.post(`https://api.airtable.com/v0/${process.env.NEXT_PUBLIC_AIRTABLE_BASE_ID}/${process.env.NEXT_PUBLIC_SHIPPLING_TABLE}`, {
+        fields: {
+          CityName: formData.cityName,
+          Date: formData.date,
+          State: formData.state,
+          PinCode: formData.pincode,
+          FullName: formData.fullName,
+          Email: formData.email,
+          Address: formData.address,
+          Others: formData.others,
+          Country: formData.country,
+          Landmark: formData.landmark,
+          GstIN: formData.gstin,
+          MobileNumber: formData.mobileNumber,
+          CompanyName: formData.companyName
         }
-      }
-    } else {
-      setErrors(validationErrors);
+      }, {
+        headers: {
+          Authorization: `Bearer ${process.env.NEXT_PUBLIC_AIRTABLE_API_KEY}`,
+        },
+      });
+      console.log('Form submitted successfully', record);
+      setSubmitting(true);
+      console.log(z.record);
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setSubmitting(false);
+    }};
 
-    }
+  // const { setError } = useForm();
+  // const handleBlur = (fieldName: string) => {
+  //   setError(fieldName, {
+  //     type: 'manual',
+  //     message: errors[fieldName]?.message as string
+  //   });
+    
+  // };
+  
 
-    };
-
-    return (
-
-      <>
-
-        <form onSubmit={handleSubmit}>
-          <div className="bg-white p-2 rounded-lg px-4">
-            <div className="border-2 py-2 border-black rounded-md px-4">
-              <div className="">
-                <p className="py-2 font-bold text-gray-700">Buyer Details</p>
-                <div className="grid grid-cols-1  py-2 gap-4 md:grid-cols-3">
-                  <div>
-                    <label
-                      htmlFor="full-name"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Full Name
-                    </label>
-                    <input
-                      type="text"
-                      name="fullName" // Add name attribute
-                      value={formData.fullName}
-                      onChange={handleInputChange}
-                      id="fullName"
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your full name"
-                    />
-                     {errors.fullName && <span className="text-red-500">{errors.fullName}</span>}
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="email"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Email (Optional)
-                    </label>
-                    <input
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      type="email"
-                      id="email"
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your email"
-                    />
-                     {errors.email && <span className="text-red-500">{errors.email}</span>}
-                  </div>
-                  <div>
-                    <label
-                      htmlFor="number"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Mobile number
-                    </label>
-                    <input
-                      value={formData.mobileNumber}
-                      onChange={handleInputChange}
-                      type="number"
-                      id="mobileNumber"
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your mobile number"
-                    />
-                     {errors.mobileNumber && <span className="text-red-500">{errors.mobileNumber}</span>}
-                  </div>
-                </div>
-              </div>
-
-              <p className="py-2 font-bold text-gray-700">Buyer Address Details</p>
-              {/* below details div  */}
+  return (
+    <form onSubmit={handleSubmit(onSubmit)}>
+      <div className="bg-white p-2 rounded-lg px-4">
+        <div className="border-2 py-2 border-black rounded-md px-4">
+          <div className="">
+            <p className="py-2 font-bold text-gray-700">Buyer Details</p>
+            <div className="grid grid-cols-1  py-2 gap-4 md:grid-cols-3">
+              {/* Full Name */}
               <div>
-                <div className="flex flex-col md:flex-row w-full gap-4">
-                  <div className="w-full lg:w-1/2 md:w-full">
-                    <label
-                      htmlFor="pincode"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Pin Code
-                    </label>
-                    <input
-                      type="number"
-                      id="pincode"
-                      value={formData.pincode}
-                      onChange={handleInputChange}
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your Pin Code"
-                    />
-                     {errors.pincode && <span className="text-red-500">{errors.pincode}</span>}
-                  </div>
-                  <div className="w-full lg:w-1/2 md:w-full">
-                    <label
-                      htmlFor="city"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      City Name
-                    </label>
-                    <input
-                      type="text"
-                      id="cityName"
-                      value={formData.cityName}
-                      onChange={handleInputChange}
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your City Name"
-                    />
-                     {errors.cityName && <span className="text-red-500">{errors.cityName}</span>}
-                  </div>
-                </div>
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="w-full lg:w-1/2 md:w-full">
-                    <label
-                      htmlFor="state"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      State
-                    </label>
-                    <input
-                      type="text"
-                      id="state"
-                      value={formData.state}
-                      onChange={handleInputChange}
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your State"
-                    />
-                     {errors.state && <span className="text-red-500">{errors.state}</span>}
-                  </div>
-                  <div className="w-full lg:w-1/2 md:w-full">
-                    <label
-                      htmlFor="country"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Country
-                    </label>
-                    <input
-                      type="text"
-                      id="country"
-                      value={formData.country}
-                      onChange={handleInputChange}
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your Country"
-                    /> 
-                    {errors.country && <span className="text-red-500">{errors.country}</span>}
-                  </div>
-                </div>
-
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className=" lg:w-1/2 md:w-full">
-                    <Label htmlFor="address" value="Complete address" />
-                    <Textarea
-                      id="address"
-                      placeholder="Leave a comment..."
-                      value={formData.address}
-                      onChange={handleInputChange} 
-                      rows={4}
-                    />
-                    {errors.address && <span className="text-red-500">{errors.address}</span>}
-                  </div>
-                  <div className="lg:w-1/2 md:w-full">
-                    <Label htmlFor="landmark" value="LandMark (optional)" />
-                    <Textarea
-                      id="landmark"
-                      placeholder="Enter the landmark..."
-                      rows={4}
-                      value={formData.landmark}
-                      onChange={handleInputChange}
-                    />
-                     {errors.landmark && <span className="text-red-500">{errors.landmark}</span>}
-                  </div>
-                </div>
-
+                <label htmlFor="fullName" className="block mb-2 text-sm font-medium text-gray-500">Full Name</label>
+                 <input type="text" id="fullName" {...register("fullName")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your full name" />
+                {errors.fullName && <span className="text-red-500">Full Name is required</span>}
+                 {/* <input type="text" id="fullName" {...register("fullName")} onBlur={() => handleBlur("fullName")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your full name" />
+                {errors.fullName && <span className="text-red-500">Full Name is required</span>} */}
               </div>
+              {/* Email */}
               <div>
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="w-full lg:w-1/2 md:w-full">
-                    <label
-                      htmlFor="date"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Date of Shipment
-                    </label>
-                    <input
-                      type="text"
-                      id="date"
-                      value={formData.date}
-                      onChange={handleInputChange}
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your Date of shipment"
-                    />
-                     {errors.date && <span className="text-red-500">{errors.date}</span>}
-                  </div>
-                  <div className="w-full lg:w-1/2 md:w-full">
-                    <label
-                      htmlFor="others"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Others
-                    </label>
-                    <input
-                      type="text"
-                      id="others"
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder=" Others"
-                      value={formData.others}
-                      onChange={handleInputChange}
-                    />
-                     {errors.others && <span className="text-red-500">{errors.others}</span>}
-                  </div>
-                </div>
-                <div className="flex flex-col md:flex-row gap-4">
-                  <div className="w-full lg:w-1/2 md:w-full">
-                    <label
-                      htmlFor="Buyer"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Buyer's Company name
-                    </label>
-                    <input
-                      type="text"
-                      id="companyName"
-                      value={formData.companyName}
-                      onChange={handleInputChange}
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder="Enter your Buyer"
-                    />
-                     {errors.companyName && <span className="text-red-500">{errors.companyName}</span>}
-                  </div>
-                  <div className="w-full lg:w-1/2 md:w-full">
-                    <label
-                      htmlFor="gstin"
-                      className="block mb-2 text-sm font-medium text-gray-500"
-                    >
-                      Buyer's GSTIN
-                    </label>
-                    <input
-                      type="text"
-                      id="gstin"
-                      className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5"
-                      placeholder=" Buyer's GSTIN"
-                      value={formData.gstin}
-                      onChange={handleInputChange}
-                    />
-                     {/* {errors.gstin && <span className="text-red-500">{errors.email}</span>} */}
-                  </div>
-                </div>
+                <label htmlFor="email" className="block mb-2 text-sm font-medium text-gray-500">Email (Optional)</label>
+                <input type="text" id="email" {...register("email")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your email" />
+                {errors.email && <span className="text-red-500">Invalid Email</span>}
               </div>
-
-            </div>
-            <div className="flex ml-3 mt-2 items-center gap-2">
-              <Checkbox id="shipping-address" />
-              <Label htmlFor="shipping-address">
-                Add different Shipping address
-              </Label>
-            </div>
-            <div className="flex ml-3 mt-2 items-center gap-2">
-              <Checkbox id="billing-address" />
-              <Label htmlFor="billing-address">Add different Billing address</Label>
-            </div>
-            <div className=" flex flex-col items-center space-y-5 md:flex-row md:space-x-5 md:space-y-0 md:p-4">
-              <button
-                type="reset"
-                onClick={() => {
-                  setFormData({
-                    fullName: "",
-                    email: "",
-                    mobileNumber: "",
-                    pincode: "",
-                    state: "",
-                    address: "",
-                    date: "",
-                    country: "",
-                    cityName: "",
-                    landmark: "",
-                    others: "",
-                    gstin: "",
-                    companyName: "",
-                  });
-                }}
-                className="w-[150px] border-[1px] border-red-400 py-2 text-red-400 md:ml-auto"
-              >
-                Reset Changes
-              </button>
-
-              <button type="submit" className="w-[150px]  bg-red-400 py-2">
-                Continue
-              </button>
+              {/* Mobile Number */}
+              <div>
+                <label htmlFor="mobileNumber" className="block mb-2 text-sm font-medium text-gray-500">Mobile number</label>
+                <input type="text" id="mobileNumber" {...register("mobileNumber")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your mobile number" />
+                {errors.mobileNumber && <span className="text-red-500">minimum 10 number</span>}
+              </div>
             </div>
           </div>
-        </form>
-      </>
-    );
-  }
 
-  export default Form;
+          {/* Buyer Address Details */}
+          <p className="py-2 font-bold text-gray-700">Buyer Address Details</p>
+          <div>
+            {/* Pin Code and City Name */}
+            <div className="flex flex-col md:flex-row w-full gap-4">
+              <div className="w-full lg:w-1/2 md:w-full">
+                <label htmlFor="pincode" className="block mb-2 text-sm font-medium text-gray-500">Pin Code</label>
+                <input type="text" id="pincode" {...register("pincode")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your Pin Code" />
+                {errors.pincode && <span className="text-red-500">Invalid Pin Code</span>}
+              </div>
+              <div className="w-full lg:w-1/2 md:w-full">
+                <label htmlFor="cityName" className="block mb-2 text-sm font-medium text-gray-500">City Name</label>
+                <input type="text" id="cityName" {...register("cityName")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your City Name" />
+                {errors.cityName && <span className="text-red-500">City Name is required</span>}
+              </div>
+            </div>
+            {/* State and Country */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="w-full lg:w-1/2 md:w-full">
+                <label htmlFor="state" className="block mb-2 text-sm font-medium text-gray-500">State</label>
+                <input type="text" id="state" {...register("state")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your State" />
+                {errors.state && <span className="text-red-500">State is required</span>}
+              </div>
+              <div className="w-full lg:w-1/2 md:w-full">
+                <label htmlFor="country" className="block mb-2 text-sm font-medium text-gray-500">Country</label>
+                <input type="text" id="country" {...register("country")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your Country" />
+                {errors.country && <span className="text-red-500">Country is required</span>}
+              </div>
+            </div>
+
+            {/* Address and Landmark */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="lg:w-1/2 md:w-full">
+                <Label htmlFor="address" value="Complete address" />
+                <Textarea id="address" placeholder="Leave a comment..." {...register("address")} rows={4} />
+                {errors.address && <span className="text-red-500">Address is required</span>}
+              </div>
+              <div className="lg:w-1/2 md:w-full">
+                <Label htmlFor="landmark" value="LandMark (optional)" />
+                <Textarea id="landmark" placeholder="Enter the landmark..." {...register("landmark")} rows={4} />
+              </div>
+            </div>
+
+            {/* Date of Shipment and Others */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="w-full lg:w-1/2 md:w-full">
+                <label htmlFor="date" className="block mb-2 text-sm font-medium text-gray-500">Date of Shipment</label>
+                {/* <input type="text" id="date" {...register("date")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your Date of shipment" /> */}
+                
+                {errors.date && <span className="text-red-500">Date of Shipment is required</span>}
+              </div>
+              <div className="w-full lg:w-1/2 md:w-full">
+                <label htmlFor="others" className="block mb-2 text-sm font-medium text-gray-500">Others</label>
+                <input type="text" id="others" {...register("others")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder=" Others" />
+              </div>
+            </div>
+
+            {/* Buyer's Company name and GSTIN */}
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="w-full lg:w-1/2 md:w-full">
+                <label htmlFor="companyName" className="block mb-2 text-sm font-medium text-gray-500">Buyer's Company name</label>
+                <input type="text" id="companyName" {...register("companyName")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder="Enter your Buyer" />
+                {errors.companyName && <span className="text-red-500">Company Name is required</span>}
+              </div>
+              <div className="w-full lg:w-1/2 md:w-full">
+                <label htmlFor="gstin" className="block mb-2 text-sm font-medium text-gray-500">Buyer's GSTIN</label>
+                <input type="text" id="gstin" {...register("gstin")} className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5" placeholder=" Buyer's GSTIN" />
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div className="flex ml-3 mt-2 items-center gap-2">
+          <Checkbox id="shipping-address" />
+          <Label htmlFor="shipping-address">Add different Shipping address</Label>
+        </div>
+        <div className="flex ml-3 mt-2 items-center gap-2">
+          <Checkbox id="billing-address" />
+          <Label htmlFor="billing-address">Add different Billing address</Label>
+        </div>
+        <div className="flex flex-col items-center space-y-5 md:flex-row md:space-x-5 md:space-y-0 md:p-4">
+          <button type="reset" className="w-[150px] border-[1px] border-red-400 py-2 text-red-400 md:ml-auto">Reset Changes</button>
+          <button type="submit" className="w-[150px]  bg-red-400 py-2">Continue</button>
+        </div>
+      </div>
+    </form>
+  );
+}
+
+export default Form;
